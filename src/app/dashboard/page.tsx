@@ -1,48 +1,41 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import WalletConnect from '../components/WalletConnect';
 
+type Job = {
+  id: number;
+  title: string;
+  pay: string;
+  description: string;
+  walletAddress: string;
+};
+
 export default function Dashboard() {
-  // Mock data for jobs
-  const jobs = [
-    {
-      id: 1,
-      title: 'Smart Contract Auditor',
-      company: 'DeFi Protocol X',
-      pay: '50 MAS/hour',
-      description: 'Audit our new staking contracts for vulnerabilities.',
-    },
-    {
-      id: 2,
-      title: 'Frontend Developer',
-      company: 'NFT Marketplace Y',
-      pay: '0.5 MAS/minute',
-      description: 'Build a responsive UI for our upcoming NFT launch.',
-    },
-    {
-      id: 3,
-      title: 'Community Manager',
-      company: 'DAO Z',
-      pay: '1000 MAS/month',
-      description: 'Manage our Discord community and organize events.',
-    },
-    {
-      id: 4,
-      title: 'Rust Engineer',
-      company: 'Massa Labs',
-      pay: '60 MAS/hour',
-      description: 'Contribute to the core protocol development.',
-    },
-    {
-      id: 5,
-      title: 'Technical Writer',
-      company: 'Web3 Edu',
-      pay: '0.1 MAS/minute',
-      description: 'Write technical documentation and tutorials.',
-    },
-  ];
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (!res.ok) {
+          throw new Error('Failed to fetch jobs');
+        }
+        const data = await res.json();
+        setJobs(data);
+      } catch (err: any) {
+        console.error('Error loading jobs', err);
+        setError(err?.message || 'Failed to load jobs');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadJobs();
+  }, []);
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-green-950">
@@ -58,9 +51,18 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-6 py-10">
-        <h1 className="mb-8 text-3xl font-bold text-green-950 dark:text-green-50">
+        <h1 className="mb-4 text-3xl font-bold text-green-950 dark:text-green-50">
           Available Jobs
         </h1>
+
+        {loading && (
+          <p className="mb-4 text-sm text-green-800/70 dark:text-green-200/70">
+            Loading jobs...
+          </p>
+        )}
+        {error && !loading && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
 
         <div className="grid gap-6">
           {jobs.map((job) => (
@@ -74,7 +76,7 @@ export default function Dashboard() {
                     {job.title}
                   </h2>
                   <p className="text-sm text-green-800/70 dark:text-green-200/70">
-                    {job.company}
+                    Posted by {job.walletAddress}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -91,6 +93,11 @@ export default function Dashboard() {
               </p>
             </div>
           ))}
+          {!loading && jobs.length === 0 && !error && (
+            <p className="text-green-500 dark:text-green-400">
+              No jobs posted yet.
+            </p>
+          )}
         </div>
       </main>
     </div>

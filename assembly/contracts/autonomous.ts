@@ -6,6 +6,7 @@ const AMOUNT_KEY = "amount";
 const INTERVAL_KEY = "interval"; // in slots
 const STATE_KEY = "state"; // "RUNNING" or "STOPPED"
 const THREAD_COUNT: u64 = 32;
+const FEE_PER_INTERVAL: u64 = 107_500_000; // 0.1075 MAS in nanoMAS
 
 /**
  * Initialize the contract with recipient address, amount per transfer, and interval
@@ -182,6 +183,14 @@ export function sendCoinsAutonomously(_: StaticArray<u8>): void {
   
   const intervalArgs = new Args(intervalBytes);
   const interval = intervalArgs.nextU64().unwrap();
+
+  // Require enough balance for both payout amount and the fixed 0.1075 MAS fee
+  const requiredForNextInterval = amount + FEE_PER_INTERVAL;
+  if (balance < requiredForNextInterval) {
+    generateEvent("Insufficient contract balance for next interval (amount + fee), stopping autonomous execution");
+    Storage.set(stringToBytes(STATE_KEY), stringToBytes("STOPPED"));
+    return;
+  }
 
   // Send coins to recipient
   const actualAmount = amount > balance ? balance : amount;

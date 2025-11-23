@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccountStore } from "@massalabs/react-ui-kit";
 import { SmartContract, Args, OperationStatus } from "@massalabs/massa-web3";
+import { Toaster, toast } from "sonner";
 import WalletConnect from "../components/WalletConnect";
 
 const BUILDNET_RPC_URL = "https://buildnet.massa.net/api/v2";
 
 export default function DebugPage() {
   const { connectedAccount } = useAccountStore();
+  const lastFinalBalanceRef = useRef<number | null>(null);
   const [isDeployingMain, setIsDeployingMain] = useState(false);
   const [isDeployingAutonomous, setIsDeployingAutonomous] = useState(false);
   const [mainStatus, setMainStatus] = useState<string | null>(null);
@@ -51,6 +53,14 @@ export default function DebugPage() {
     null
   );
   const [isTransferring, setIsTransferring] = useState(false);
+  const [simBalanceMas, setSimBalanceMas] = useState<string>("");
+  const [simPayoutPerIntervalMas, setSimPayoutPerIntervalMas] =
+    useState<string>("");
+  const [eventLogs, setEventLogs] = useState<
+    { data: string; slot: string; isFinal: boolean; isError: boolean }[]
+  >([]);
+  const [isFetchingEvents, setIsFetchingEvents] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
   const nanoAmountDisplay =
     amount.trim().length === 0 || Number.isNaN(Number(amount))
@@ -84,6 +94,63 @@ export default function DebugPage() {
 
     const slots = Math.round(value * slotsPerUnit);
     return slots.toString();
+  })();
+
+  const simResult = (() => {
+    const balanceTrimmed = simBalanceMas.trim();
+    const payoutTrimmed = simPayoutPerIntervalMas.trim();
+    if (!balanceTrimmed || !payoutTrimmed) return null;
+
+    const balanceBeforeStart = Number(balanceTrimmed);
+    const payoutPer = Number(payoutTrimmed);
+    const feePer = 0.1075; // MAS per interval
+    const startCost = 0.1441; // MAS, one-time cost to call `start`
+
+    if (
+      !Number.isFinite(balanceBeforeStart) ||
+      !Number.isFinite(payoutPer) ||
+      balanceBeforeStart <= 0 ||
+      payoutPer <= 0
+    ) {
+      return null;
+    }
+
+    const per = payoutPer + feePer; // total cost per interval (payout + fixed fee)
+
+    const effectiveBalance = balanceBeforeStart - startCost;
+    if (effectiveBalance <= 0) {
+      // Not enough to even pay the start cost
+      return {
+        intervals: 0,
+        costPer: per.toFixed(6),
+        totalSent: "0.000000",
+        remaining: effectiveBalance.toFixed(6),
+        totalPayout: "0.000000",
+        fees: "0.000000",
+        payoutPer: payoutPer.toFixed(6),
+        startCost: startCost.toFixed(6),
+        balanceAfterStart: effectiveBalance.toFixed(6),
+      };
+    }
+
+    const intervals = Math.floor(effectiveBalance / per);
+
+    const totalSentIntervals = intervals * per;
+    const remainingAfterIntervals = effectiveBalance - totalSentIntervals;
+    const totalPayout = intervals * payoutPer;
+    const fees = totalSentIntervals - totalPayout;
+
+    return {
+      intervals,
+      costPer: per.toFixed(6),
+      totalSent: totalSentIntervals.toFixed(6),
+      remaining: remainingAfterIntervals.toFixed(6),
+      totalPayout: totalPayout.toFixed(6),
+      fees: fees.toFixed(6),
+      payoutPer: payoutPer.toFixed(6),
+      startCost: startCost.toFixed(6),
+      balanceAfterStart: effectiveBalance.toFixed(6),
+    };
   })();
 
   const nanoToMas = (nanoStr: string): string => {
@@ -121,6 +188,77 @@ export default function DebugPage() {
     const months = days / 30;
     return `${months.toFixed(2)} months`;
   };
+
+  useEffect(() => {
+    const address = connectedAccount?.address;
+    if (!address) {
+      lastFinalBalanceRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollBalance = async () => {
+      try {
+        const response = await fetch(BUILDNET_RPC_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "get_addresses",
+            params: [[address]],
+            id: 1,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: any = await response.json();
+
+        if (!data.error && Array.isArray(data.result) && data.result.length > 0) {
+          const info = data.result[0] as any;
+          const finalBalanceStr = String(info.final_balance ?? "0");
+          const finalBalance = Number(finalBalanceStr);
+
+          if (!Number.isFinite(finalBalance)) {
+            return;
+          }
+
+          if (lastFinalBalanceRef.current === null) {
+            lastFinalBalanceRef.current = finalBalance;
+          } else if (finalBalance > lastFinalBalanceRef.current) {
+            const delta = finalBalance - lastFinalBalanceRef.current;
+            lastFinalBalanceRef.current = finalBalance;
+
+            const deltaMas = delta.toFixed(6);
+            const newBalanceMas = finalBalance.toFixed(6);
+
+            toast.success(`Received ${deltaMas} MAS`, {
+              description: `New balance: ${newBalanceMas} MAS`,
+            });
+          } else {
+            lastFinalBalanceRef.current = finalBalance;
+          }
+        }
+      } catch (e) {
+        console.error("Error polling wallet balance", e);
+      }
+
+      if (!cancelled) {
+        setTimeout(pollBalance, 10000);
+      }
+    };
+
+    pollBalance();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectedAccount?.address]);
 
   useEffect(() => {
     if (!mainOperationId || !connectedAccount) return;
@@ -192,6 +330,49 @@ export default function DebugPage() {
       cancelled = true;
     };
   }, [autonomousOperationId, connectedAccount]);
+
+  const handleFetchEvents = async () => {
+    if (!connectedAccount) {
+      setEventsError("Please connect your wallet first.");
+      return;
+    }
+    if (!autonomousAddress) {
+      setEventsError("Please set the autonomous contract address first.");
+      return;
+    }
+
+    setIsFetchingEvents(true);
+    setEventsError(null);
+    try {
+      const events = await (connectedAccount as any).getEvents({
+        emitter_address: autonomousAddress,
+        is_final: true,
+      });
+
+      const mapped = (Array.isArray(events) ? events : []).map((ev: any) => {
+        const slot = ev.context?.slot;
+        const slotStr =
+          slot && typeof slot.period === "number" && typeof slot.thread === "number"
+            ? `${slot.period}:${slot.thread}`
+            : "?";
+        const isFinal = Boolean(ev.context?.is_final);
+        const isError = Boolean(ev.context?.is_error);
+
+        return {
+          data: String(ev.data ?? ""),
+          slot: slotStr,
+          isFinal,
+          isError,
+        };
+      });
+
+      setEventLogs(mapped.reverse());
+    } catch (e: any) {
+      setEventsError(e?.message || "Failed to fetch events.");
+    } finally {
+      setIsFetchingEvents(false);
+    }
+  };
 
   const handleDeployMain = async () => {
     setMainError(null);
@@ -581,6 +762,7 @@ export default function DebugPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-green-50 dark:bg-green-950">
+      <Toaster richColors position="top-right" />
       <WalletConnect />
 
       <div className="rounded-xl border border-green-200 bg-white px-6 py-4 shadow-sm dark:border-green-800 dark:bg-green-900/50 max-w-xl w-full mx-4">
@@ -708,6 +890,67 @@ export default function DebugPage() {
         <h2 className="text-lg font-semibold text-green-950 dark:text-green-50">
           Debug: Autonomous contract (autonomous.wasm)
         </h2>
+
+        <div className="rounded-lg border border-green-200 bg-green-50/60 p-3 text-xs text-green-950 dark:border-green-800 dark:bg-green-950/40 dark:text-green-50 space-y-2">
+          <p className="font-semibold">Payout simulation (off-chain)</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                Balance in MAS
+              </span>
+              <input
+                type="number"
+                className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                value={simBalanceMas}
+                onChange={(e) => setSimBalanceMas(e.target.value)}
+                placeholder="e.g. 2"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                Payout per interval (MAS)
+              </span>
+              <input
+                type="number"
+                className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                value={simPayoutPerIntervalMas}
+                onChange={(e) => setSimPayoutPerIntervalMas(e.target.value)}
+                placeholder="e.g. 0.1"
+              />
+            </label>
+            <div className="flex flex-col justify-center text-[11px] text-green-900 dark:text-green-100">
+              {simResult ? (
+                <div className="space-y-1">
+                  <p>
+                    <span className="font-semibold">Intervals:</span> {simResult.intervals}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Total sent:</span> {simResult.totalSent} MAS
+                  </p>
+                  <p>
+                    <span className="font-semibold">Remaining:</span> {simResult.remaining} MAS
+                  </p>
+                  {simResult.totalPayout && simResult.fees && simResult.payoutPer && (
+                    <>
+                      <p>
+                        <span className="font-semibold">Payout to freelancer:</span>{" "}
+                        {simResult.intervals} × {simResult.payoutPer} = {simResult.totalPayout} MAS
+                      </p>
+                      <p>
+                        <span className="font-semibold">Fees:</span>{" "}
+                        {simResult.totalSent} − {simResult.totalPayout} = {simResult.fees} MAS
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="italic text-[11px] text-green-800/80 dark:text-green-200/80">
+                  Enter balance and per-interval cost to see simulation.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
           <label className="flex flex-col gap-1">
@@ -891,6 +1134,48 @@ export default function DebugPage() {
               )}
             </div>
           )}
+
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                Autonomous events log
+              </h3>
+              <button
+                type="button"
+                onClick={handleFetchEvents}
+                disabled={
+                  !connectedAccount || !autonomousAddress || isFetchingEvents
+                }
+                className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-medium text-slate-800 hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-700"
+              >
+                {isFetchingEvents ? "Loading..." : "Fetch events"}
+              </button>
+            </div>
+            {eventsError && (
+              <p className="text-[11px] text-red-600 dark:text-red-400">
+                {eventsError}
+              </p>
+            )}
+            <div className="max-h-40 overflow-y-auto rounded-md bg-gray-50 p-2 text-[11px] font-mono text-gray-800 dark:bg-green-950/40 dark:text-gray-100">
+              {eventLogs.length === 0 ? (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  No events loaded yet.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {eventLogs.map((ev, idx) => (
+                    <li key={`${ev.slot}-${idx}`} className="flex flex-col gap-0.5">
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        [{ev.isFinal ? "final" : "candidate"}]
+                        {ev.isError ? " [error]" : ""} slot {ev.slot}
+                      </span>
+                      <span>{ev.data}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
 
           {autonomousOperationId && (
             <div className="mt-3 space-y-1 rounded-lg bg-gray-50 p-3 text-xs dark:bg-green-950/40">
