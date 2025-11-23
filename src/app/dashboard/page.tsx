@@ -1,5 +1,8 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
+import WalletConnect from '../components/WalletConnect';
 
 export default function Dashboard() {
   // Mock data for jobs
@@ -49,9 +52,7 @@ export default function Dashboard() {
           <Link href="/" className="text-xl font-bold text-green-950 dark:text-green-50">
             Massa Freelance
           </Link>
-          <button className="rounded-full bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:text-white dark:hover:bg-green-400">
-            Connect Wallet
-          </button>
+          <WalletConnect />
         </div>
       </header>
 

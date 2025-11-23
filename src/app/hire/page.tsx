@@ -2,20 +2,18 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useAccountStore } from '@massalabs/react-ui-kit';
+import WalletConnect from '../components/WalletConnect';
 
 export default function Hire() {
-  const [walletConnected, setWalletConnected] = useState(false);
+  const { connectedAccount } = useAccountStore();
   const [jobs, setJobs] = useState([
     { id: 1, title: 'Frontend Developer', pay: '0.5 MAS/minute', description: 'React expert needed.' },
     { id: 2, title: 'Backend Engineer', pay: '60 MAS/hour', description: 'Node.js and PostgreSQL.' },
   ]);
 
-  const handleConnectWallet = () => {
-    setWalletConnected(!walletConnected);
-  };
-
   const handleDelete = (id: number) => {
-    if (!walletConnected) {
+    if (!connectedAccount) {
       alert('Please connect your wallet first.');
       return;
     }
@@ -24,7 +22,7 @@ export default function Hire() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!walletConnected) {
+    if (!connectedAccount) {
       alert('Please connect your wallet first.');
       return;
     }
@@ -48,12 +46,7 @@ export default function Hire() {
           <Link href="/" className="text-xl font-bold text-green-950 dark:text-green-50">
             Massa Freelance
           </Link>
-          <button 
-            onClick={handleConnectWallet}
-            className="rounded-full bg-green-600 px-6 py-2 text-sm font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:text-white dark:hover:bg-green-400"
-          >
-            {walletConnected ? 'Wallet Connected' : 'Connect Wallet'}
-          </button>
+          <WalletConnect />
         </div>
       </header>
 
