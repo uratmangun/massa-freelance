@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useAccountStore } from "@massalabs/react-ui-kit/src/lib/ConnectMassaWallets";
-import { useLocalStorage } from "@massalabs/react-ui-kit/src/lib/util/hooks/useLocalStorage";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAccountStore } from "@massalabs/react-ui-kit";
 import { getWallets } from "@massalabs/wallet-provider";
 
 type SavedAccount = {
@@ -16,10 +15,29 @@ const EMPTY_ACCOUNT: SavedAccount = {
 const useAccountSync = () => {
   const { connectedAccount, setCurrentWallet } = useAccountStore();
 
-  const [savedAccount, setSavedAccount] = useLocalStorage<SavedAccount>(
-    "saved-account",
+  const [savedAccount, setSavedAccountState] = useState<SavedAccount>(
     EMPTY_ACCOUNT
   );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("saved-account");
+      if (saved) {
+        try {
+          setSavedAccountState(JSON.parse(saved));
+        } catch (error) {
+          console.error("Error parsing saved account:", error);
+        }
+      }
+    }
+  }, []);
+
+  const setSavedAccount = useCallback((account: SavedAccount) => {
+    setSavedAccountState(account);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("saved-account", JSON.stringify(account));
+    }
+  }, []);
 
   const getStoredAccount = useCallback(async (address: string) => {
     const wallets = await getWallets();
