@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Massa Freelance
+
+A decentralized freelance platform built on the [Massa](https://massa.net/) blockchain. This project leverages Massa's unique features like autonomous smart contracts to create a robust and efficient marketplace for freelancers and clients.
+
+## Features
+
+- **Decentralized Platform**: Built on the Massa blockchain for transparency and security.
+- **Smart Contracts**: Custom AssemblyScript contracts for handling agreements and transactions.
+    - **Autonomous Execution**: Utilizes Massa's autonomous smart contracts (`autonomous.ts`) for automated tasks.
+- **Modern Frontend**: Built with [Next.js](https://nextjs.org/) and [Tailwind CSS](https://tailwindcss.com/) for a responsive and performant user interface.
+- **Database Integration**: Uses [Drizzle ORM](https://orm.drizzle.team/) with PostgreSQL for efficient data management.
+- **Developer Tools**: Includes scripts for contract deployment, balance checking, and debugging.
+
+## Tech Stack
+
+- **Frontend**: Next.js, React, Tailwind CSS, Lucide React
+- **Blockchain**: Massa Web3, AssemblyScript (for Smart Contracts)
+- **Database**: PostgreSQL, Drizzle ORM
+- **Tooling**: Biome (Linting/Formatting), Bun (Script Runner)
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [Bun](https://bun.sh/) (for running scripts)
+- [PostgreSQL](https://www.postgresql.org/) database
 
 ## Getting Started
 
-First, run the development server:
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd massa-freelance
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+# or
+bun install
+```
+
+### 3. Environment Setup
+
+Copy the example environment file and update it with your credentials:
+
+```bash
+cp .env.example .env
+```
+
+Make sure to configure your database connection string and Massa node details in the `.env` file.
+
+### 4. Database Setup
+
+Generate and migrate the database schema:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### 5. Smart Contracts
+
+Compile the AssemblyScript smart contracts:
+
+```bash
+npm run build:wasm
+```
+
+To deploy the contracts (requires a running Massa node and configured wallet):
+
+```bash
+npm run deploy:contract
+# or for autonomous contracts
+npm run deploy:autonomous
+```
+
+### 6. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev`: Starts the Next.js development server.
+- `npm run build`: Builds the Next.js application for production.
+- `npm run lint`: Runs Biome to check for linting errors.
+- `npm run format`: Formats code using Biome.
+- `npm run build:wasm`: Compiles smart contracts to WebAssembly.
+- `npm run deploy:contract`: Deploys the main smart contract.
+- `npm run check:operation`: Checks the status of a Massa operation.
+- `bun scripts/fetch-akindo-submissions.ts`: Fetches submissions from Akindo.
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+- `src/app`: Next.js application pages and components.
+- `src/db`: Database schema and configuration.
+- `assembly`: Smart contracts written in AssemblyScript.
+- `scripts`: Utility scripts for deployment, testing, and data fetching.
+- `drizzle`: Database migration files.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)
