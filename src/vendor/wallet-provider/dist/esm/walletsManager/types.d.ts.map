@@ -1,0 +1,1 @@
+{"version":3,"file":"types.d.ts","sourceRoot":"","sources":["../../../src/walletsManager/types.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,gCAAgC,CAAC;AAChE,OAAO,EAAE,YAAY,EAAE,MAAM,8BAA8B,CAAC;AAC5D,OAAO,EAAE,kBAAkB,EAAE,MAAM,oCAAoC,CAAC;AAExE,MAAM,MAAM,gBAAgB,GAAG,CAC3B,OAAO,YAAY,GACnB,OAAO,kBAAkB,GACzB,OAAO,cAAc,CACxB,EAAE,CAAC"}

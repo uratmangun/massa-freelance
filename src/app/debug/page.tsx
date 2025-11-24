@@ -1,40 +1,17 @@
-"use client";
+import type { Metadata } from "next";
+import DebugClient from "./DebugClient";
 
-import { useEffect, useRef, useState } from "react";
-import { useAccountStore } from "@massalabs/react-ui-kit";
-import { SmartContract, Args, OperationStatus } from "@massalabs/massa-web3";
-import { Toaster, toast } from "sonner";
-import WalletConnect from "../components/WalletConnect";
+export const dynamic = "force-dynamic";
 
-const BUILDNET_RPC_URL = "https://buildnet.massa.net/api/v2";
+export const metadata: Metadata = {
+  title: "Massa freelance – Debug",
+};
 
 export default function DebugPage() {
-  const { connectedAccount } = useAccountStore();
-  const lastFinalBalanceRef = useRef<number | null>(null);
-  const [isDeployingMain, setIsDeployingMain] = useState(false);
-  const [isDeployingAutonomous, setIsDeployingAutonomous] = useState(false);
-  const [mainStatus, setMainStatus] = useState<string | null>(null);
-  const [mainError, setMainError] = useState<string | null>(null);
-  const [autonomousStatus, setAutonomousStatus] = useState<string | null>(null);
-  const [autonomousError, setAutonomousError] = useState<string | null>(null);
-  const [contractAddress, setContractAddress] = useState<string | null>(null);
-  const [mainOperationId, setMainOperationId] = useState<string | null>(null);
-  const [mainOperationStatus, setMainOperationStatus] =
-    useState<OperationStatus | null>(null);
-  const [autonomousOperationId, setAutonomousOperationId] = useState<
-    string | null
-  >(null);
-  const [autonomousOperationStatus, setAutonomousOperationStatus] =
-    useState<OperationStatus | null>(null);
+  return <DebugClient />;
+}
 
-  // Autonomous contract specific state
-  const [autonomousAddress, setAutonomousAddress] = useState<string>("");
-  const [recipient, setRecipient] = useState<string>("");
-  const [amount, setAmount] = useState<string>(""); // 0.1 MAS in nanoMAS
-  const [interval, setInterval] = useState<string>(""); // human interval value
-  const [intervalUnit, setIntervalUnit] = useState<"minute" | "hour" | "day" | "month">(
-    "hour"
-  );
+/*
 
   const [readConfigResult, setReadConfigResult] = useState<
     | { recipient: string; amount: string; interval: string }
@@ -1229,3 +1206,4 @@ export default function DebugPage() {
     </div>
   );
 }
+*/

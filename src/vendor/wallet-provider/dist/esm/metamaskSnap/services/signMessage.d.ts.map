@@ -1,0 +1,1 @@
+{"version":3,"file":"signMessage.d.ts","sourceRoot":"","sources":["../../../../src/metamaskSnap/services/signMessage.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,qBAAqB,CAAC;AAElE,OAAO,KAAK,EAEV,mBAAmB,EACpB,MAAM,0BAA0B,CAAC;AAElC,eAAO,MAAM,WAAW,aACZ,sBAAsB,gCAE/B,QAAQ,mBAAmB,CAW7B,CAAC"}

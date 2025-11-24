@@ -1,0 +1,1 @@
+{"version":3,"file":"getBalance.d.ts","sourceRoot":"","sources":["../../../../src/metamaskSnap/services/getBalance.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,qBAAqB,CAAC;AAElE,OAAO,KAAK,EAEV,sBAAsB,EACvB,MAAM,0BAA0B,CAAC;AAElC,eAAO,MAAM,UAAU,aACX,sBAAsB,mCAE/B,QAAQ,sBAAsB,CAWhC,CAAC"}
