@@ -136,7 +136,7 @@ export default function DebugPage() {
     const intervals = Math.floor(effectiveBalance / per);
 
     const totalSentIntervals = intervals * per;
-    const remainingAfterIntervals = effectiveBalance - totalSentIntervals;
+    const remainingAfterIntervals = effectiveBalance - totalSentIntervals + 0.0366;
     const totalPayout = intervals * payoutPer;
     const fees = totalSentIntervals - totalPayout;
 

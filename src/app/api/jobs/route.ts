@@ -32,9 +32,10 @@ export async function POST(request: Request) {
       intervalValue,
       intervalUnit,
       walletAddress,
+      contractAddress,
     } = body ?? {};
 
-    if (!title || !description || !amount || !intervalValue || !intervalUnit || !walletAddress) {
+    if (!title || !description || !amount || !intervalValue || !intervalUnit || !walletAddress || !contractAddress) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 },
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
         intervalUnit,
         description,
         walletAddress,
+        contractAddress,
       })
       .returning();
 

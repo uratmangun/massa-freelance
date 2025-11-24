@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAccountStore } from '@massalabs/react-ui-kit';
+import { SmartContract, Args } from '@massalabs/massa-web3';
 import WalletConnect from '../components/WalletConnect';
 
 export default function Hire() {
@@ -16,6 +17,8 @@ export default function Hire() {
   const [amount, setAmount] = useState('');
   const [interval, setInterval] = useState('');
   const [intervalUnit, setIntervalUnit] = useState<'minute' | 'hour' | 'day' | 'month'>('hour');
+  const [simBalanceMas, setSimBalanceMas] = useState('');
+  const [simPayoutPerIntervalMas, setSimPayoutPerIntervalMas] = useState('');
 
   const nanoAmountDisplay =
     amount.trim().length === 0 || Number.isNaN(Number(amount))
@@ -49,6 +52,63 @@ export default function Hire() {
 
     const slots = Math.round(value * slotsPerUnit);
     return slots.toString();
+  })();
+
+  const simResult = (() => {
+    const balanceTrimmed = simBalanceMas.trim();
+    const payoutTrimmed = simPayoutPerIntervalMas.trim();
+    if (!balanceTrimmed || !payoutTrimmed) return null;
+
+    const balanceBeforeStart = Number(balanceTrimmed);
+    const payoutPer = Number(payoutTrimmed);
+    const feePer = 0.1075; // MAS per interval
+    const startCost = 0.1441; // MAS, one-time cost to call `start`
+
+    if (
+      !Number.isFinite(balanceBeforeStart) ||
+      !Number.isFinite(payoutPer) ||
+      balanceBeforeStart <= 0 ||
+      payoutPer <= 0
+    ) {
+      return null;
+    }
+
+    const per = payoutPer + feePer; // total cost per interval (payout + fixed fee)
+
+    const effectiveBalance = balanceBeforeStart - startCost;
+    if (effectiveBalance <= 0) {
+      // Not enough to even pay the start cost
+      return {
+        intervals: 0,
+        costPer: per.toFixed(6),
+        totalSent: '0.000000',
+        remaining: effectiveBalance.toFixed(6),
+        totalPayout: '0.000000',
+        fees: '0.000000',
+        payoutPer: payoutPer.toFixed(6),
+        startCost: startCost.toFixed(6),
+        balanceAfterStart: effectiveBalance.toFixed(6),
+      };
+    }
+
+    const intervals = Math.floor(effectiveBalance / per);
+
+    const totalSentIntervals = intervals * per;
+    const remainingAfterIntervals = effectiveBalance - totalSentIntervals +0.0366;
+    const totalPayout = intervals * payoutPer;
+    const fees = totalSentIntervals - totalPayout;
+
+    return {
+      intervals,
+      costPer: per.toFixed(6),
+      totalSent: totalSentIntervals.toFixed(6),
+      remaining: remainingAfterIntervals.toFixed(6),
+      totalPayout: totalPayout.toFixed(6),
+      fees: fees.toFixed(6),
+      payoutPer: payoutPer.toFixed(6),
+      startCost: startCost.toFixed(6),
+      balanceAfterStart: effectiveBalance.toFixed(6),
+    };
   })();
 
   const handleDelete = async (id: number) => {
@@ -97,6 +157,61 @@ export default function Hire() {
 
     setIsPosting(true);
     try {
+      // First deploy the autonomous smart contract for this job
+      let contractAddress: string | null = null;
+      try {
+        const wasmRes = await fetch('/autonomous.wasm');
+        if (!wasmRes.ok) {
+          throw new Error('Failed to fetch /autonomous.wasm');
+        }
+
+        const wasmBuffer = await wasmRes.arrayBuffer();
+        const wasmBytes = new Uint8Array(wasmBuffer);
+
+        const masAmount = Number(amountValue);
+        if (!Number.isFinite(masAmount) || Number.isNaN(masAmount) || masAmount < 0) {
+          alert('Invalid MAS amount.');
+          return;
+        }
+        const nanoAmount = BigInt(Math.round(masAmount * 1_000_000_000));
+
+        if (!intervalSlotsDisplay) {
+          alert('Please enter a valid interval.');
+          return;
+        }
+        const intervalSlots = BigInt(intervalSlotsDisplay);
+
+        const args = new Args();
+        // 1) recipient address (string) - start with employer, can be updated later
+        // 2) amount per transfer (u64 nanoMAS)
+        // 3) interval in slots (u64)
+        args.addString(connectedAccount.address);
+        args.addU64(nanoAmount);
+        args.addU64(intervalSlots);
+
+        const sc = await SmartContract.deploy(
+          connectedAccount as any,
+          wasmBytes,
+          args,
+          {
+            fee: 10_000_000n,
+            maxGas: 3_000_000_000n,
+            coins: 100_000_000n,
+          },
+        );
+
+        const addr =
+          (sc as any).address?.toString?.() ?? String((sc as any).address ?? '');
+        if (!addr) {
+          throw new Error('Failed to obtain contract address from deployment.');
+        }
+        contractAddress = addr;
+      } catch (err: any) {
+        console.error('Error deploying autonomous contract', err);
+        alert(err?.message || 'Failed to deploy autonomous contract.');
+        return;
+      }
+
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: {
@@ -109,6 +224,7 @@ export default function Hire() {
           intervalValue,
           intervalUnit: unitValue,
           walletAddress: connectedAccount.address,
+          contractAddress,
         }),
       });
 
@@ -241,6 +357,67 @@ export default function Hire() {
                   )}
                 </label>
               </div>
+
+              <div className="mt-3 rounded-lg border border-green-200 bg-green-50/60 p-3 text-xs text-green-950 dark:border-green-800 dark:bg-green-950/40 dark:text-green-50 space-y-2">
+                <p className="font-semibold">Payout simulation (off-chain)</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                      Balance in MAS
+                    </span>
+                    <input
+                      type="number"
+                      className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                      value={simBalanceMas}
+                      onChange={(e) => setSimBalanceMas(e.target.value)}
+                      placeholder="e.g. 2"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                      Payout per interval (MAS)
+                    </span>
+                    <input
+                      type="number"
+                      className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                      value={simPayoutPerIntervalMas}
+                      onChange={(e) => setSimPayoutPerIntervalMas(e.target.value)}
+                      placeholder="e.g. 0.1"
+                    />
+                  </label>
+                  <div className="flex flex-col justify-center text-[11px] text-green-900 dark:text-green-100">
+                    {simResult ? (
+                      <div className="space-y-1">
+                        <p>
+                          <span className="font-semibold">Intervals:</span> {simResult.intervals}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Total sent:</span> {simResult.totalSent} MAS
+                        </p>
+                        <p>
+                          <span className="font-semibold">Remaining:</span> {simResult.remaining} MAS
+                        </p>
+                        {simResult.totalPayout && simResult.fees && simResult.payoutPer && (
+                          <>
+                            <p>
+                              <span className="font-semibold">Payout to freelancer:</span>{' '}
+                              {simResult.intervals} * {simResult.payoutPer} = {simResult.totalPayout} MAS
+                            </p>
+                            <p>
+                              <span className="font-semibold">Fees:</span>{' '}
+                              {simResult.totalSent} - {simResult.totalPayout} = {simResult.fees} MAS
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="italic text-[11px] text-green-800/80 dark:text-green-200/80">
+                        Enter balance and per-interval cost to see simulation.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-green-900 dark:text-green-100">
@@ -290,17 +467,37 @@ export default function Hire() {
                     {job.pay}
                   </p>
                 </div>
-                <button 
-                  onClick={() => handleDelete(job.id)}
-                  disabled={deletingId === job.id}
-                  className="rounded-full border border-green-200 px-6 py-2 text-sm font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-green-900 dark:text-green-400 dark:hover:bg-green-950/30"
-                >
-                  {deletingId === job.id ? 'Removing...' : 'Remove'}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href={`/hire/${job.id}/applicants`}
+                    className="rounded-full border border-green-200 px-6 py-2 text-sm font-medium text-green-600 hover:bg-green-50 text-center dark:border-green-900 dark:text-green-400 dark:hover:bg-green-950/30"
+                  >
+                    View Applicants
+                  </Link>
+                  <button 
+                    onClick={() => handleDelete(job.id)}
+                    disabled={deletingId === job.id}
+                    className="rounded-full border border-green-200 px-6 py-2 text-sm font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-green-900 dark:text-green-400 dark:hover:bg-green-950/30"
+                  >
+                    {deletingId === job.id ? 'Removing...' : 'Remove'}
+                  </button>
+                </div>
               </div>
               <p className="mt-4 text-green-900/80 dark:text-green-100/80">
                 {job.description}
               </p>
+              {job.contractAddress && (
+                <p className="mt-2 text-[11px] text-green-800 dark:text-green-200 break-all">
+                  <a
+                    href={`https://buildnet-explorer.massa.net/#explorer?explore=${job.contractAddress}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono underline decoration-dotted underline-offset-2"
+                  >
+                    Contract: {job.contractAddress}
+                  </a>
+                </p>
+              )}
             </div>
           ))}
           {jobs.length === 0 && (
