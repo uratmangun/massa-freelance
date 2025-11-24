@@ -60,6 +60,60 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
   const [cfgAmountMasInput, setCfgAmountMasInput] = useState('');
   const [cfgIntervalInput, setCfgIntervalInput] = useState('');
   const [cfgIntervalUnit, setCfgIntervalUnit] = useState<'minute' | 'hour' | 'day' | 'month'>('hour');
+  const [cfgAmountFromSC, setCfgAmountFromSC] = useState<bigint | null>(null);
+  const [cfgIntervalFromSC, setCfgIntervalFromSC] = useState<bigint | null>(null);
+  const [simBalanceMasInput, setSimBalanceMasInput] = useState('');
+  const [simPayoutPerIntervalMasInput, setSimPayoutPerIntervalMasInput] = useState('');
+
+  const NANO_MAS = 1_000_000_000n;
+
+  const formatMasFromNano = (nano: bigint): string => {
+    const sign = nano < 0n ? '-' : '';
+    const abs = nano < 0n ? -nano : nano;
+    const integer = abs / NANO_MAS;
+    const fraction = abs % NANO_MAS;
+    if (fraction === 0n) return `${sign}${integer.toString()}`;
+    const fractionStr = fraction.toString().padStart(9, '0').replace(/0+$/, '');
+    return `${sign}${integer.toString()}.${fractionStr}`;
+  };
+
+  const cfgAmountMasFromSC = useMemo(() => {
+    if (cfgAmountFromSC === null) return null;
+    return formatMasFromNano(cfgAmountFromSC);
+  }, [cfgAmountFromSC]);
+
+  const onchainIntervalDisplay = useMemo(() => {
+    if (cfgIntervalFromSC === null || !job) return null;
+
+    let slotsPerUnit: bigint;
+    switch (job.intervalUnit) {
+      case 'minute':
+        slotsPerUnit = 4n;
+        break;
+      case 'hour':
+        slotsPerUnit = 4n * 60n;
+        break;
+      case 'day':
+        slotsPerUnit = 4n * 60n * 24n;
+        break;
+      case 'month':
+        slotsPerUnit = 4n * 60n * 24n * 30n;
+        break;
+      default:
+        slotsPerUnit = 1n;
+    }
+
+    if (slotsPerUnit === 0n) return `${cfgIntervalFromSC.toString()} slots`;
+
+    const value = cfgIntervalFromSC / slotsPerUnit;
+    const remainder = cfgIntervalFromSC % slotsPerUnit;
+
+    if (remainder !== 0n) {
+      return `${cfgIntervalFromSC.toString()} slots`;
+    }
+
+    return `${value.toString()} ${job.intervalUnit}`;
+  }, [cfgIntervalFromSC, job]);
 
   const jobIntervalSlots = useMemo(() => {
     if (!job) return null;
@@ -89,10 +143,8 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
   }, [job]);
 
   const jobSimResult = useMemo(() => {
-    if (!job || !contractBalance) return null;
-
-    const balanceTrimmed = String(contractBalance.final ?? '').trim();
-    const payoutTrimmed = String(job.amountMas ?? '').trim();
+    const balanceTrimmed = simBalanceMasInput.trim();
+    const payoutTrimmed = simPayoutPerIntervalMasInput.trim();
     if (!balanceTrimmed || !payoutTrimmed) return null;
 
     const balanceBeforeStart = Number(balanceTrimmed);
@@ -145,7 +197,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
       startCost: startCost.toFixed(6),
       balanceAfterStart: effectiveBalance.toFixed(6),
     };
-  }, [job, contractBalance]);
+  }, [simBalanceMasInput, simPayoutPerIntervalMasInput]);
 
   const cfgIntervalSlotsDisplay = useMemo(() => {
     const trimmed = cfgIntervalInput.trim();
@@ -236,6 +288,8 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
 
       // keep local form state in sync with on-chain config recipient
       setCfgRecipient(recipientFromConfig);
+      setCfgAmountFromSC(cfgAmount);
+      setCfgIntervalFromSC(cfgInterval);
 
       setAutonomousStatus(
         `Config — recipient: ${recipientFromConfig}, amount (nanoMAS): ${cfgAmount.toString()}, interval (slots): ${cfgInterval.toString()}`,
@@ -356,6 +410,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
       const status = await waitForOperationFinalization(op.id);
       if (status === OperationStatus.Success) {
         setCfgRecipient(applicant.walletAddress);
+        await handleHire(applicant.id);
       } else if (status !== null) {
         setAutonomousError('updateConfig operation failed or not finalized.');
       }
@@ -413,26 +468,6 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
     setAutonomousStatus(null);
 
     try {
-      const args = new Args();
-      args.addBool(true).addString(applicant.walletAddress);
-      args.addBool(false);
-      args.addBool(false);
-
-      const updateOp = await (connectedAccount as any).callSC({
-        target: job.contractAddress,
-        func: 'updateConfig',
-        parameter: args,
-      });
-
-      setAutonomousStatus(`updateConfig sent. Operation ID: ${updateOp.id}`);
-      setAutonomousOperationId(updateOp.id);
-
-      const updateStatus = await waitForOperationFinalization(updateOp.id);
-      if (updateStatus !== OperationStatus.Success) {
-        setAutonomousError('updateConfig operation failed or not finalized.');
-        return;
-      }
-
       const startOp = await (connectedAccount as any).callSC({
         target: job.contractAddress,
         func: 'start',
@@ -576,6 +611,8 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
           } else {
             setContractBalance(null);
             setBalanceError(null);
+            setCfgAmountFromSC(null);
+            setCfgIntervalFromSC(null);
           }
         }
 
@@ -599,6 +636,11 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
     }
   }, [jobId]);
 
+  useEffect(() => {
+    if (!connectedAccount || !job || !job.contractAddress) return;
+    handleReadConfig();
+  }, [connectedAccount, job]);
+
   const handleHire = async (applicantId: number) => {
     if (!connectedAccount) {
       alert('Please connect your wallet first.');
@@ -606,37 +648,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
     }
 
     setHiringId(applicantId);
-    try {
-      const res = await apiFetch(`/api/applicants/${applicantId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: 'hired' }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        alert(data?.error || 'Failed to hire freelancer.');
-        return;
-      }
-
-      // Update local state
-      setApplicants(prev =>
-        prev.map(applicant =>
-          applicant.id === applicantId
-            ? { ...applicant, status: 'hired' as const }
-            : applicant,
-        ),
-      );
-
-      alert(`Freelancer hired successfully! They can now start working.`);
-    } catch (error) {
-      console.error('Error hiring freelancer:', error);
-      alert('Failed to hire freelancer.');
-    } finally {
-      setHiringId(null);
-    }
+  
   };
 
   const handleReject = async (applicantId: number) => {
@@ -713,7 +725,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
               href="/hire"
               className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
             >
-              																				← Back to Jobs
+            																		← Back to Jobs
             </Link>
             <h1 className="text-xl font-bold text-green-950 dark:text-green-50">
               Job Applicants
@@ -735,7 +747,8 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
           </p>
           <div className="flex flex-wrap gap-4 text-sm">
             <span className="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200 rounded-full">
-              {job.amountMas} MAS per {job.intervalValue} {job.intervalUnit}
+              {(cfgAmountMasFromSC ?? job.amountMas)} MAS per{' '}
+              {(onchainIntervalDisplay ?? `${job.intervalValue} ${job.intervalUnit}`)}
             </span>
             <span className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200 rounded-full">
               {applicants.filter(a => a.status === 'pending').length} pending applicants
@@ -844,6 +857,8 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
                     {isWithdrawing ? 'Withdrawing...' : 'Withdraw max balance'}
                   </button>
                 </div>
+
+               
               </>
             )}
             {job.contractAddress && !contractBalance && isCheckingBalance && (
@@ -867,6 +882,68 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
               {autonomousError}
             </p>
           )}
+           { (
+                  <div className="mt-4 space-y-2 text-[11px] text-green-900 dark:text-green-100">
+                    <p className="font-semibold">Payout simulation (off-chain)</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                          Balance in MAS
+                        </span>
+                        <input
+                          type="number"
+                          className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                          value={simBalanceMasInput}
+                          onChange={(e) => setSimBalanceMasInput(e.target.value)}
+                          placeholder={contractBalance?.final ? `${contractBalance.final}` : 'e.g. 2'}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-medium text-green-900 dark:text-green-100">
+                          Payout per interval (MAS)
+                        </span>
+                        <input
+                          type="number"
+                          className="rounded-md border border-green-200 px-2 py-1 text-[11px] text-black dark:border-green-700 dark:bg-green-950/60 dark:text-white"
+                          value={simPayoutPerIntervalMasInput}
+                          onChange={(e) => setSimPayoutPerIntervalMasInput(e.target.value)}
+                          placeholder={job?.amountMas ? `${job.amountMas}` : 'e.g. 0.1'}
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center text-[11px] text-green-900 dark:text-green-100">
+                        {jobSimResult ? (
+                          <div className="space-y-1">
+                            <p>
+                              <span className="font-semibold">Intervals:</span> {jobSimResult.intervals}
+                            </p>
+                            <p>
+                              <span className="font-semibold">Total sent:</span> {jobSimResult.totalSent} MAS
+                            </p>
+                            <p>
+                              <span className="font-semibold">Remaining:</span> {jobSimResult.remaining} MAS
+                            </p>
+                            {jobSimResult.totalPayout && jobSimResult.fees && jobSimResult.payoutPer && (
+                              <>
+                                <p>
+                                  <span className="font-semibold">Payout to freelancer:</span>{' '}
+                                  {jobSimResult.intervals} * {jobSimResult.payoutPer} = {jobSimResult.totalPayout} MAS
+                                </p>
+                                <p>
+                                  <span className="font-semibold">Fees:</span>{' '}
+                                  {jobSimResult.totalSent} - {jobSimResult.totalPayout} = {jobSimResult.fees} MAS
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="italic text-[11px] text-green-800/80 dark:text-green-200/80">
+                            Enter balance and per-interval cost to see simulation.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
         </div>
 
         {/* Applicants List */}
@@ -939,7 +1016,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
                         <button
                           type="button"
                           onClick={() => handleUpdateRecipientForApplicant(applicant)}
-                          disabled={!connectedAccount || isCalling || isOperationPending}
+                          disabled={!connectedAccount || isCalling || isOperationPending || isRecipientMatch}
                           className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                         >
                           Set as recipient
@@ -947,31 +1024,17 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
                         <button
                           type="button"
                           onClick={() => handleStartForApplicant(applicant)}
-                          disabled=
-                            {!connectedAccount ||
-                              isCalling ||
-                              isOperationPending ||
-                              !canStartAutonomous}
+                          disabled={
+                            !connectedAccount ||
+                            isCalling ||
+                            isOperationPending ||
+                           !isRecipientMatch
+                          }
                           className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-60 dark:bg-green-500 dark:hover:bg-green-400"
                         >
                           Start autonomous
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleHire(applicant.id)}
-                          disabled={hiringId === applicant.id || !connectedAccount}
-                          className="rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400"
-                        >
-                          {hiringId === applicant.id ? 'Hiring...' : 'Mark hired'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(applicant.id)}
-                          disabled={rejectingId === applicant.id || !connectedAccount}
-                          className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60 dark:bg-red-500 dark:hover:bg-red-400"
-                        >
-                          {rejectingId === applicant.id ? 'Rejecting...' : 'Reject'}
-                        </button>
+                    
                       </div>
                     </div>
                   </div>
