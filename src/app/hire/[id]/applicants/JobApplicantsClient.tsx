@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAccountStore } from '@massalabs/react-ui-kit';
 import { Args, OperationStatus } from '@massalabs/massa-web3';
 import WalletConnect from '../../../components/WalletConnect';
+import { apiFetch } from '../../../lib/api';
 
 const BUILDNET_RPC_URL = 'https://buildnet.massa.net/api/v2';
 
@@ -565,7 +566,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
     const fetchJobAndApplicants = async () => {
       try {
         // Fetch job details
-        const jobRes = await fetch(`/api/jobs/${jobId}`);
+        const jobRes = await apiFetch(`/api/jobs/${jobId}`);
         if (jobRes.ok) {
           const jobData = await jobRes.json();
           setJob(jobData);
@@ -579,7 +580,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
         }
 
         // Fetch applicants
-        const applicantsRes = await fetch(`/api/jobs/${jobId}/applicants`);
+        const applicantsRes = await apiFetch(`/api/jobs/${jobId}/applicants`);
         if (applicantsRes.ok) {
           const applicantsData: Applicant[] = await applicantsRes.json();
           setApplicants(applicantsData);
@@ -606,7 +607,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
 
     setHiringId(applicantId);
     try {
-      const res = await fetch(`/api/applicants/${applicantId}`, {
+      const res = await apiFetch(`/api/applicants/${applicantId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -646,7 +647,7 @@ export default function JobApplicantsClient({ jobId }: JobApplicantsClientProps)
 
     setRejectingId(applicantId);
     try {
-      const res = await fetch(`/api/applicants/${applicantId}`, {
+      const res = await apiFetch(`/api/applicants/${applicantId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
