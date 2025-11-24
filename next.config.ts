@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const isDeweb = process.env.NEXT_PUBLIC_DEPLOY_TARGET === "deweb";
+
 const nextConfig: NextConfig = {
   /* config options here */
+  output: isDeweb ? "export" : undefined,
   reactCompiler: true,
   transpilePackages: [
     "@massalabs/react-ui-kit",
