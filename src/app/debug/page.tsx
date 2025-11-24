@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import DebugClient from "./DebugClient";
 
-export const dynamic = "force-dynamic";
+
 
 export const metadata: Metadata = {
   title: "Massa freelance – Debug",

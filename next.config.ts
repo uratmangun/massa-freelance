@@ -5,7 +5,10 @@ const isDeweb = process.env.NEXT_PUBLIC_DEPLOY_TARGET === "deweb";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: isDeweb ? "export" : undefined,
+  output: "export",
+  images: {
+    unoptimized: true,
+  },
   reactCompiler: true,
   transpilePackages: [
     "@massalabs/react-ui-kit",
