@@ -16,7 +16,10 @@
     "transfer:mas": "bun scripts/transfer_mas.ts",
     "check:operation": "bun scripts/check-operation.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "deweb:build": "NEXT_PUBLIC_DEPLOY_TARGET=deweb next build --webpack",
+    "deweb:upload": "deweb upload out --node_url=\"https://buildnet.massa.net/api/v2\"",
+    "deweb:deploy": "bun run deweb:build && bun run deweb:upload"
   },
   "dependencies": {
     "@massalabs/massa-as-sdk": "^3.0.2",
@@ -36,6 +39,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
     "@massalabs/as-types": "^2.1.0",
+    "@massalabs/deweb-cli": "^0.6.1",
     "@massalabs/massa-sc-compiler": "^0.2.0",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -44,9 +48,11 @@
     "assemblyscript": "^0.27.24",
     "autoprefixer": "^10.4.22",
     "babel-plugin-react-compiler": "1.0.0",
+    "drizzle-kit": "^0.31.5",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4",
     "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
     "tw-colors": "^3.3.2",
     "typescript": "^5",
     "drizzle-kit": "^0.31.5"

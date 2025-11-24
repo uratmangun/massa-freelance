@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAccountStore } from '@massalabs/react-ui-kit';
 import { SmartContract, Args } from '@massalabs/massa-web3';
 import WalletConnect from '../components/WalletConnect';
+import { apiFetch } from '../lib/api';
 
 function HireClient() {
   const { connectedAccount } = useAccountStore();
@@ -119,7 +120,7 @@ function HireClient() {
 
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/jobs/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         alert(data?.error || 'Failed to remove job.');
@@ -212,7 +213,7 @@ function HireClient() {
         return;
       }
 
-      const res = await fetch('/api/jobs', {
+      const res = await apiFetch('/api/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +253,7 @@ function HireClient() {
   useEffect(() => {
     const loadJobs = async () => {
       try {
-        const res = await fetch('/api/jobs');
+        const res = await apiFetch('/api/jobs');
         if (!res.ok) return;
         const data = await res.json();
         setJobs(data);

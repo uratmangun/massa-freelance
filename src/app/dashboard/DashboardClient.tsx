@@ -6,6 +6,7 @@ import { useAccountStore } from "@massalabs/react-ui-kit";
 import { Args } from "@massalabs/massa-web3";
 import { Toaster, toast } from "sonner";
 import WalletConnect from "../components/WalletConnect";
+import { apiFetch } from "../lib/api";
 
 const BUILDNET_RPC_URL = "https://buildnet.massa.net/api/v2";
 
@@ -39,7 +40,7 @@ export default function DashboardClient() {
   useEffect(() => {
     const loadJobs = async () => {
       try {
-        const res = await fetch("/api/jobs");
+        const res = await apiFetch("/api/jobs");
         if (!res.ok) {
           throw new Error("Failed to fetch jobs");
         }
@@ -234,7 +235,7 @@ export default function DashboardClient() {
     setApplyError(null);
 
     try {
-      const res = await fetch(`/api/jobs/${selectedJob.id}/applicants`, {
+      const res = await apiFetch(`/api/jobs/${selectedJob.id}/applicants`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

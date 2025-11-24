@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import DashboardClient from "./DashboardClient";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
 export const metadata: Metadata = {
   title: "Massa freelance – Dashboard",
