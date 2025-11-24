@@ -22,6 +22,7 @@ type Job = {
 export default function DashboardClient() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [configRecipients, setConfigRecipients] = useState<Record<number, string | null>>({});
+  const [appliedJobs, setAppliedJobs] = useState<Record<number, boolean>>({});
   const [walletBalance, setWalletBalance] = useState<{ final: string; candidate: string } | null>(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -195,6 +196,49 @@ export default function DashboardClient() {
     fetchConfigRecipients();
   }, [jobs, connectedAccount, configRecipients]);
 
+  useEffect(() => {
+    const fetchAppliedJobs = async () => {
+      if (!connectedAccount?.address || jobs.length === 0) {
+        setAppliedJobs({});
+        return;
+      }
+
+      const address = connectedAccount.address;
+
+      try {
+        const results = await Promise.all(
+          jobs.map(async (job) => {
+            try {
+              const res = await apiFetch(`/api/jobs/${job.id}/applicants`);
+              if (!res.ok) {
+                return { jobId: job.id, applied: false };
+              }
+              const data: any[] = await res.json();
+              const hasApplied =
+                Array.isArray(data) &&
+                data.some((applicant) => applicant.walletAddress === address);
+
+              return { jobId: job.id, applied: hasApplied };
+            } catch (err) {
+              console.error("Error checking applicants for job", job.id, err);
+              return { jobId: job.id, applied: false };
+            }
+          }),
+        );
+
+        const map: Record<number, boolean> = {};
+        for (const result of results) {
+          map[result.jobId] = result.applied;
+        }
+        setAppliedJobs(map);
+      } catch (err) {
+        console.error("Error fetching applied jobs", err);
+      }
+    };
+
+    fetchAppliedJobs();
+  }, [jobs, connectedAccount?.address]);
+
   const openApplyModal = (job: Job) => {
     if (!connectedAccount) {
       alert("Please connect your wallet first.");
@@ -221,6 +265,8 @@ export default function DashboardClient() {
     e.preventDefault();
     if (!selectedJob) return;
 
+    const jobId = selectedJob.id;
+
     if (!connectedAccount) {
       alert("Please connect your wallet first.");
       return;
@@ -235,7 +281,7 @@ export default function DashboardClient() {
     setApplyError(null);
 
     try {
-      const res = await apiFetch(`/api/jobs/${selectedJob.id}/applicants`, {
+      const res = await apiFetch(`/api/jobs/${jobId}/applicants`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -255,6 +301,10 @@ export default function DashboardClient() {
       }
 
       alert("Application submitted successfully.");
+      setAppliedJobs((prev) => ({
+        ...prev,
+        [jobId]: true,
+      }));
       closeApplyModal();
     } catch (err) {
       console.error("Error submitting application", err);
@@ -323,6 +373,8 @@ export default function DashboardClient() {
               typeof configRecipient === "string" &&
               configRecipient.trim().length > 0 &&
               configRecipient.trim() === connectedAccount.address;
+            const hasApplied =
+              !!connectedAccount?.address && appliedJobs[job.id];
 
             return (
               <div
@@ -359,6 +411,13 @@ export default function DashboardClient() {
                         <div className="rounded-full bg-green-100 px-6 py-2 text-sm font-medium text-green-800 dark:bg-green-800 dark:text-green-100">
                           You&apos;re hired
                         </div>
+                      ) : hasApplied ? (
+                        <button
+                          className="rounded-full border border-green-200 px-6 py-2 text-sm font-medium text-green-900/60 dark:border-green-800 dark:text-green-400 cursor-default"
+                          disabled
+                        >
+                          Already applied
+                        </button>
                       ) : (
                         <button
                           className="rounded-full border border-green-200 px-6 py-2 text-sm font-medium text-green-900 hover:bg-green-50 dark:border-green-800 dark:text-green-100 dark:hover:bg-green-900/50"
