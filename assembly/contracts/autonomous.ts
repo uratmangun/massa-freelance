@@ -6,6 +6,7 @@ const AMOUNT_KEY = "amount";
 const INTERVAL_KEY = "interval"; // in slots
 const STATE_KEY = "state"; // "RUNNING" or "STOPPED"
 const THREAD_COUNT: u64 = 32;
+const FEE_PER_INTERVAL: u64 = 107_500_000; // 0.1075 MAS in nanoMAS
 
 /**
  * Initialize the contract with recipient address, amount per transfer, and interval
@@ -26,6 +27,65 @@ export function constructor(args: StaticArray<u8>): void {
   Storage.set(stringToBytes(STATE_KEY), stringToBytes("STOPPED"));
 
   generateEvent(`Contract initialized: recipient=${recipient}, amount=${amount}, interval=${interval}`);
+}
+
+/**
+ * Update configuration (recipient, amount, interval). Missing args reuse stored value.
+ */
+export function updateConfig(args: StaticArray<u8>): void {
+  const owner = Context.transactionCreator();
+  assert(Context.caller() == owner, "Caller is not the contract deployer");
+
+  const parsedArgs = new Args(args);
+
+  const recipientFlag = parsedArgs.nextBool();
+  if (!recipientFlag.isErr() && recipientFlag.unwrap()) {
+    const newRecipient = parsedArgs.nextString().unwrap();
+    Storage.set(stringToBytes(RECIPIENT_KEY), stringToBytes(newRecipient));
+  }
+
+  const amountFlag = parsedArgs.nextBool();
+  if (!amountFlag.isErr() && amountFlag.unwrap()) {
+    const newAmount = parsedArgs.nextU64().unwrap();
+    Storage.set(stringToBytes(AMOUNT_KEY), new Args().add(newAmount).serialize());
+  }
+
+  const intervalFlag = parsedArgs.nextBool();
+  if (!intervalFlag.isErr() && intervalFlag.unwrap()) {
+    const newInterval = parsedArgs.nextU64().unwrap();
+    Storage.set(stringToBytes(INTERVAL_KEY), new Args().add(newInterval).serialize());
+  }
+
+  const config = readConfigInternal();
+  generateEvent(`Config updated: recipient=${config.recipient}, amount=${config.amount}, interval=${config.interval}`);
+}
+
+class Config {
+  constructor(public recipient: string, public amount: u64, public interval: u64) {}
+}
+
+function readConfigInternal(): Config {
+  const recipientBytes = Storage.get(stringToBytes(RECIPIENT_KEY));
+  const amountBytes = Storage.get(stringToBytes(AMOUNT_KEY));
+  const intervalBytes = Storage.get(stringToBytes(INTERVAL_KEY));
+
+  const recipient = bytesToString(recipientBytes);
+  const amount = new Args(amountBytes).nextU64().unwrap();
+  const interval = new Args(intervalBytes).nextU64().unwrap();
+
+  return new Config(recipient, amount, interval);
+}
+
+/**
+ * Read current configuration values
+ */
+export function readConfig(_: StaticArray<u8>): StaticArray<u8> {
+  const config = readConfigInternal();
+  return new Args()
+    .add(config.recipient)
+    .add(config.amount)
+    .add(config.interval)
+    .serialize();
 }
 
 /**
@@ -124,6 +184,14 @@ export function sendCoinsAutonomously(_: StaticArray<u8>): void {
   const intervalArgs = new Args(intervalBytes);
   const interval = intervalArgs.nextU64().unwrap();
 
+  // Require enough balance for both payout amount and the fixed 0.1075 MAS fee
+  const requiredForNextInterval = amount + FEE_PER_INTERVAL;
+  if (balance < requiredForNextInterval) {
+    generateEvent("Insufficient contract balance for next interval (amount + fee), stopping autonomous execution");
+    Storage.set(stringToBytes(STATE_KEY), stringToBytes("STOPPED"));
+    return;
+  }
+
   // Send coins to recipient
   const actualAmount = amount > balance ? balance : amount;
   
@@ -148,6 +216,20 @@ export function sendCoinsAutonomously(_: StaticArray<u8>): void {
   );
 
   generateEvent(`Next execution scheduled for slot ${nextExecutionSlot}`);
+}
+
+/**
+ * Withdraw the entire contract balance to the deployer
+ */
+export function withdrawMaxBalance(_: StaticArray<u8>): void {
+  const owner = Context.transactionCreator();
+  assert(Context.caller() == owner, "Caller is not the contract deployer");
+
+  const balance = Coins.balance();
+  assert(balance > 0, "Contract balance is 0");
+
+  transferCoins(owner, balance);
+  generateEvent(`Withdrew ${balance} nanoMAS to owner ${owner.toString()}`);
 }
 
 /**

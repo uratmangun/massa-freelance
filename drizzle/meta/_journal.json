@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1763897253479,
+      "tag": "0000_mean_plazm",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763947503671,
+      "tag": "0001_goofy_rachel_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763948928015,
+      "tag": "0002_early_shinko_yamashiro",
+      "breakpoints": true
+    }
+  ]
+}

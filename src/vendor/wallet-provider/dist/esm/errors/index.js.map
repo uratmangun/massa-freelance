@@ -1,0 +1,1 @@
+{"version":3,"file":"index.js","sourceRoot":"","sources":["../../../src/errors/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAsB,MAAM,QAAQ,CAAC;AACvD,OAAO,EACL,kBAAkB,GAEnB,MAAM,iBAAiB,CAAC","sourcesContent":["export { BaseError, type BaseErrorType } from './base';\nexport {\n  UserRejectionError,\n  type UserRejectionErrorType,\n} from './userRejection';\n"]}

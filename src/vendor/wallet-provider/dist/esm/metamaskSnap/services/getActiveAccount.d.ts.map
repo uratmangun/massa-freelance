@@ -1,0 +1,1 @@
+{"version":3,"file":"getActiveAccount.d.ts","sourceRoot":"","sources":["../../../../src/metamaskSnap/services/getActiveAccount.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,qBAAqB,CAAC;AAElE,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,0BAA0B,CAAC;AAEtE,eAAO,MAAM,gBAAgB,aACjB,sBAAsB,KAC/B,QAAQ,qBAAqB,CAU/B,CAAC"}

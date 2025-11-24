@@ -1,0 +1,1 @@
+{"version":3,"file":"codes.js","sourceRoot":"","sources":["../../../../src/errors/utils/codes.ts"],"names":[],"mappings":"AAAA,MAAM,CAAN,IAAY,UAGX;AAHD,WAAY,UAAU;IACpB,6DAAa,CAAA;IACb,2DAAY,CAAA;AACd,CAAC,EAHW,UAAU,KAAV,UAAU,QAGrB","sourcesContent":["export enum ErrorCodes {\n  UserRejection,\n  UnknownError,\n}\n"]}

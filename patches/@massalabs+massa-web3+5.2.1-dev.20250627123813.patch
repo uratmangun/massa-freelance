@@ -1,3 +1,237 @@
+diff --git a/node_modules/@massalabs/massa-web3/dist/cmd/basicElements/serializers/number/integers.js b/node_modules/@massalabs/massa-web3/dist/cmd/basicElements/serializers/number/integers.js
+index 3167f47..e8442d6 100644
+--- a/node_modules/@massalabs/massa-web3/dist/cmd/basicElements/serializers/number/integers.js
++++ b/node_modules/@massalabs/massa-web3/dist/cmd/basicElements/serializers/number/integers.js
+@@ -1,7 +1,17 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.numberToInteger = exports.integerFromByte = exports.integerToByte = void 0;
+-const __1 = require("..");
++// Define constants inline to avoid circular dependency on index exports
++const U8_SIZE_BIT = 8;
++const U8_SIZE_BYTE = 1;
++const U16_SIZE_BIT = 16;
++const U32_SIZE_BIT = 32;
++const U64_SIZE_BIT = 64;
++const U64_SIZE_BYTE = 8;
++const U64_MAX = (1n << 64n) - 1n;
++const U128_SIZE_BIT = 128;
++const U256_SIZE_BIT = 256;
++const U256_SIZE_BYTE = 32;
+ function mustBeValidSigned(sizeInBits, value) {
+     const min = -(1n << (BigInt(sizeInBits) - 1n));
+     const max = (1n << (BigInt(sizeInBits) - 1n)) - 1n;
+@@ -21,31 +31,31 @@ function integerToByte(sizeInBits, value, signed = false) {
+     signed
+         ? mustBeValidSigned(sizeInBits, value)
+         : mustBeValidUnsigned(sizeInBits, value);
+-    const buffer = new ArrayBuffer(sizeInBits / __1.U8.SIZE_BIT);
++    const buffer = new ArrayBuffer(sizeInBits / U8_SIZE_BIT);
+     const view = new DataView(buffer);
+     switch (sizeInBits) {
+-        case __1.U8.SIZE_BIT:
++        case U8_SIZE_BIT:
+             signed ? view.setInt8(0, Number(value)) : view.setUint8(0, Number(value));
+             break;
+-        case __1.U16.SIZE_BIT:
++        case U16_SIZE_BIT:
+             signed
+                 ? view.setInt16(0, Number(value), true)
+                 : view.setUint16(0, Number(value), true);
+             break;
+-        case __1.U32.SIZE_BIT:
++        case U32_SIZE_BIT:
+             signed
+                 ? view.setInt32(0, Number(value), true)
+                 : view.setUint32(0, Number(value), true);
+             break;
+-        case __1.U64.SIZE_BIT:
++        case U64_SIZE_BIT:
+             signed
+                 ? view.setBigInt64(0, value, true)
+                 : view.setBigUint64(0, value, true);
+             break;
+-        case __1.U128.SIZE_BIT:
++        case U128_SIZE_BIT:
+             setBigUint128(view, value);
+             break;
+-        case __1.U256.SIZE_BIT:
++        case U256_SIZE_BIT:
+             setBigUint256(view, value);
+             break;
+         default:
+@@ -55,28 +65,28 @@ function integerToByte(sizeInBits, value, signed = false) {
+ }
+ exports.integerToByte = integerToByte;
+ function integerFromByte(sizeInBits, bytes, signed = false, index = 0) {
+-    if (bytes.length < index + sizeInBits / __1.U8.SIZE_BIT) {
++    if (bytes.length < index + sizeInBits / U8_SIZE_BIT) {
+         throw new Error('not enough bytes to read the value.');
+     }
+     const view = new DataView(bytes.buffer);
+     switch (sizeInBits) {
+-        case __1.U8.SIZE_BIT:
++        case U8_SIZE_BIT:
+             return signed ? BigInt(view.getInt8(index)) : BigInt(view.getUint8(index));
+-        case __1.U16.SIZE_BIT:
++        case U16_SIZE_BIT:
+             return signed
+                 ? BigInt(view.getInt16(index, true))
+                 : BigInt(view.getUint16(index, true));
+-        case __1.U32.SIZE_BIT:
++        case U32_SIZE_BIT:
+             return signed
+                 ? BigInt(view.getInt32(index, true))
+                 : BigInt(view.getUint32(index, true));
+-        case __1.U64.SIZE_BIT:
++        case U64_SIZE_BIT:
+             return signed
+                 ? view.getBigInt64(index, true)
+                 : view.getBigUint64(index, true);
+-        case __1.U128.SIZE_BIT:
++        case U128_SIZE_BIT:
+             return signed ? getBigInt128(view, index) : getBigUint128(view, index);
+-        case __1.U256.SIZE_BIT:
++        case U256_SIZE_BIT:
+             return signed ? getBigInt256(view, index) : getBigUint256(view, index);
+         default:
+             throw new Error(`unsupported ${signed ? 'I' : 'U'}${sizeInBits} deserialization`);
+@@ -96,35 +106,35 @@ function numberToInteger(sizeInBits, value, signed = false) {
+ exports.numberToInteger = numberToInteger;
+ function setBigUint128(view, value) {
+     const offset = 0;
+-    view.setBigUint64(offset, value & __1.U64.MAX, true);
+-    view.setBigUint64(offset + __1.U64.SIZE_BYTE, value >> BigInt(__1.U64.SIZE_BIT), true);
++    view.setBigUint64(offset, value & U64_MAX, true);
++    view.setBigUint64(offset + U64_SIZE_BYTE, value >> BigInt(U64_SIZE_BIT), true);
+ }
+ function getBigUint128(view, offset) {
+     const low = view.getBigUint64(offset, true);
+-    offset += __1.U64.SIZE_BYTE;
++    offset += U64_SIZE_BYTE;
+     const high = view.getBigUint64(offset, true);
+-    return (high << BigInt(__1.U64.SIZE_BIT)) | low;
++    return (high << BigInt(U64_SIZE_BIT)) | low;
+ }
+ function setBigUint256(view, value) {
+     let offset = 0;
+-    for (let i = 0; i < __1.U256.SIZE_BYTE / __1.U64.SIZE_BYTE; i++) {
+-        view.setBigUint64(offset, value & __1.U64.MAX, true);
+-        offset += __1.U64.SIZE_BYTE;
+-        value >>= BigInt(__1.U64.SIZE_BIT);
++    for (let i = 0; i < U256_SIZE_BYTE / U64_SIZE_BYTE; i++) {
++        view.setBigUint64(offset, value & U64_MAX, true);
++        offset += U64_SIZE_BYTE;
++        value >>= BigInt(U64_SIZE_BIT);
+     }
+ }
+ function getBigUint256(view, offset) {
+     let result = 0n;
+-    const nbParts = __1.U256.SIZE_BYTE / __1.U64.SIZE_BYTE;
++    const nbParts = U256_SIZE_BYTE / U64_SIZE_BYTE;
+     for (let i = 0; i < nbParts; i++) {
+-        const part = view.getBigUint64(offset + i * __1.U64.SIZE_BYTE, true);
+-        result = result | (part << BigInt(i * __1.U64.SIZE_BIT));
++        const part = view.getBigUint64(offset + i * U64_SIZE_BYTE, true);
++        result = result | (part << BigInt(i * U64_SIZE_BIT));
+     }
+     return result;
+ }
+ function getBigInt128(view, offset) {
+-    return BigInt.asIntN(__1.U128.SIZE_BIT, getBigUint128(view, offset));
++    return BigInt.asIntN(U128_SIZE_BIT, getBigUint128(view, offset));
+ }
+ function getBigInt256(view, offset) {
+-    return BigInt.asIntN(__1.U256.SIZE_BIT, getBigUint256(view, offset));
++    return BigInt.asIntN(U256_SIZE_BIT, getBigUint256(view, offset));
+ }
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/arrays.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/arrays.js
+index f40ac17..ce13822 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/arrays.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/arrays.js
+@@ -1,9 +1,43 @@
+ /* eslint-disable no-case-declarations */
+-import { Args, ArrayTypes, DEFAULT_OFFSET, } from '../args';
++import { Args } from '../args';
+ import { bytesToStr } from './strings';
+ import { byteToBool } from './bool';
+ import { bytesToF32, bytesToF64 } from './numbers';
+-import { U8, U16, U32, U64, U128, U256, I8, I16, I32, I64, I128, I256 } from '.';
++import * as U8 from './number/u8';
++import * as U16 from './number/u16';
++import * as U32 from './number/u32';
++import * as U64 from './number/u64';
++import * as U128 from './number/u128';
++import * as U256 from './number/u256';
++import * as I8 from './number/i8';
++import * as I16 from './number/i16';
++import * as I32 from './number/i32';
++import * as I64 from './number/i64';
++import * as I128 from './number/i128';
++import * as I256 from './number/i256';
++
++const DEFAULT_OFFSET = 0;
++var ArrayTypes;
++(function (ArrayTypes) {
++    ArrayTypes[ArrayTypes["STRING"] = 0] = "STRING";
++    ArrayTypes[ArrayTypes["BOOL"] = 1] = "BOOL";
++    ArrayTypes[ArrayTypes["U8"] = 2] = "U8";
++    ArrayTypes[ArrayTypes["U16"] = 3] = "U16";
++    ArrayTypes[ArrayTypes["U32"] = 4] = "U32";
++    ArrayTypes[ArrayTypes["U64"] = 5] = "U64";
++    ArrayTypes[ArrayTypes["U128"] = 6] = "U128";
++    ArrayTypes[ArrayTypes["U256"] = 7] = "U256";
++    ArrayTypes[ArrayTypes["I8"] = 8] = "I8";
++    ArrayTypes[ArrayTypes["I16"] = 9] = "I16";
++    ArrayTypes[ArrayTypes["I32"] = 10] = "I32";
++    ArrayTypes[ArrayTypes["I64"] = 11] = "I64";
++    ArrayTypes[ArrayTypes["I128"] = 12] = "I128";
++    ArrayTypes[ArrayTypes["I256"] = 13] = "I256";
++    ArrayTypes[ArrayTypes["F32"] = 14] = "F32";
++    ArrayTypes[ArrayTypes["F64"] = 15] = "F64";
++})(ArrayTypes || (ArrayTypes = {}));
++function concatArrays(a, b) { return new Uint8Array([...a, ...b]); }
++
+ /**
+  * Get the byte size of a typed array unit.
+  *
+@@ -43,9 +77,9 @@ export function getDatatypeSize(type) {
+  * @returns The serialized array as Uint8Array.
+  */
+ export function serializableObjectsArrayToBytes(source) {
+-    return source.reduce((acc, curr) => Args.concatArrays(acc, curr.serialize()), 
+-    //eslint-disable-next-line @typescript-eslint/no-magic-numbers
+-    new Uint8Array(0));
++    return source.reduce((acc, curr) => concatArrays(acc, curr.serialize()),
++        //eslint-disable-next-line @typescript-eslint/no-magic-numbers
++        new Uint8Array(0));
+ }
+ /**
+  * Deserializes a bytes array into an array of deserialized objects.
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/index.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/index.js
+index e4cad6f..4a80894 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/index.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/index.js
+@@ -3,7 +3,7 @@
+  * It includes functions for strings, numeric data (integers and floating-point numbers),
+  * booleans, and arrays containing native types.
+  */
+-import { Args } from '../args';
++
+ /**
+  * This module exports encoding and decoding functions for strings.
+  */
+@@ -22,8 +22,9 @@ export * from './bool';
+  * This module exports serialization and deserialization functions for arrays containing native types.
+  */
+ export * from './arrays';
++function concatArrays(a, b) { return new Uint8Array([...a, ...b]); }
+ export function argsListToBytes(argsList) {
+-    return argsList.reduce((acc, curr) => Args.concatArrays(acc, new TextEncoder().encode(curr.value)), 
++    return argsList.reduce((acc, curr) => concatArrays(acc, new TextEncoder().encode(curr.value)), 
+     // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+     new Uint8Array(0));
+ }
 diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/integers.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/integers.js
 index a45c213..0f18cd5 100644
 --- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/integers.js
@@ -142,3 +376,68 @@ index a45c213..0f18cd5 100644
 -    return BigInt.asIntN(U256.SIZE_BIT, getBigUint256(view, offset));
 +    return BigInt.asIntN(U256_SIZE_BIT, getBigUint256(view, offset));
  }
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u128.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u128.js
+index 742dd3d..d7fd9c2 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u128.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u128.js
+@@ -1,7 +1,6 @@
+-import { U8 } from '.';
+ import { numberToInteger, integerFromByte, integerToByte } from './integers';
+ export const SIZE_BYTE = 16;
+-export const SIZE_BIT = SIZE_BYTE * U8.SIZE_BIT;
++export const SIZE_BIT = 128;
+ export const MAX = (1n << BigInt(SIZE_BIT)) - 1n;
+ /**
+  * Converts an U128 value to bytes
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u16.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u16.js
+index 2c2f6fa..b795702 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u16.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u16.js
+@@ -1,7 +1,6 @@
+-import { U8 } from '.';
+ import { numberToInteger, integerFromByte, integerToByte } from './integers';
+ export const SIZE_BYTE = 2;
+-export const SIZE_BIT = SIZE_BYTE * U8.SIZE_BIT;
++export const SIZE_BIT = 16;
+ export const MAX = (1n << BigInt(SIZE_BIT)) - 1n;
+ /**
+  * Converts an U16 value to bytes
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u256.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u256.js
+index f7ad83c..f953cf1 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u256.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u256.js
+@@ -1,7 +1,6 @@
+-import { U8 } from '.';
+ import { numberToInteger, integerFromByte, integerToByte } from './integers';
+ export const SIZE_BYTE = 32;
+-export const SIZE_BIT = SIZE_BYTE * U8.SIZE_BIT;
++export const SIZE_BIT = 256;
+ export const MAX = (1n << BigInt(SIZE_BIT)) - 1n;
+ /**
+  * Converts a U256 value to bytes
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u32.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u32.js
+index 2c20468..161b696 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u32.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u32.js
+@@ -1,7 +1,6 @@
+-import { U8 } from '.';
+ import { numberToInteger, integerFromByte, integerToByte } from './integers';
+ export const SIZE_BYTE = 4;
+-export const SIZE_BIT = SIZE_BYTE * U8.SIZE_BIT;
++export const SIZE_BIT = 32;
+ export const MAX = (1n << BigInt(SIZE_BIT)) - 1n;
+ /**
+  * Converts an U32 value to bytes
+diff --git a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u64.js b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u64.js
+index a29f1e9..61f793b 100644
+--- a/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u64.js
++++ b/node_modules/@massalabs/massa-web3/dist/esm/basicElements/serializers/number/u64.js
+@@ -1,7 +1,6 @@
+-import { U8 } from '.';
+ import { numberToInteger, integerFromByte, integerToByte } from './integers';
+ export const SIZE_BYTE = 8;
+-export const SIZE_BIT = SIZE_BYTE * U8.SIZE_BIT;
++export const SIZE_BIT = 64;
+ export const MAX = (1n << BigInt(SIZE_BIT)) - 1n;
+ /**
+  * Converts an U64 value to bytes

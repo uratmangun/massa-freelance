@@ -1,0 +1,1 @@
+{"version":3,"file":"snap.js","sourceRoot":"","sources":["../../../../src/metamaskSnap/config/snap.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,MAAM,aAAa,GAAG,8BAA8B,CAAC;AAC5D,8DAA8D","sourcesContent":["export const MASSA_SNAP_ID = 'npm:@massalabs/metamask-snap';\n// export const MASSA_SNAP_ID = `local:http://localhost:8080`;\n"]}
